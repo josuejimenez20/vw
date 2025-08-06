@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de Nodos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"
+        defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="form">
+            <h1>Configuración de Infraestructura</h1>
+            <form id="configForm">
+                <label for="numNodes">Selecciona la cantidad de nodos:</label>
+                <select id="numNodes" name="numNodes">
+                    <option value="1">1 Nodo</option>
+                    <option value="2">2 Nodos</option>
+                    <option value="3">3 Nodos</option>
+                </select>
+                <button type="submit">Confirmar</button>
+            </form>
+        </div>
+        <div id="temp" style="display: none;">
+            <h1>Inicializando</h1>
+            <p>Por favor, espere unos minutos</p>
+            <p id="temporizador"></p>
+        </div>
+        <div id="downland" style="display: none;">
+            <h1>Inicializada</h1>
+            <p>Descargue por favor el archivo de acceso</p>
+            <h3 id="show-password"></h3>
+            <button id="downlandAccess" style="margin-bottom: 10px;">Descargar acceso</button>
+            <button id="destroyButton">Destruir Infraestructura</button>
+        </div>
+        <div id="destroying" style="display: none;">
+            <h1>Destruyendo Infraestructura</h1>
+            <p>Por favor, espere mientras se completa el proceso.</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+    <script>
+        let dataFile;
+        let intervalo;
+
+        const iniciarTemp = (tiempoRestante) => {
+            const temporizador = document.getElementById("temporizador");
+
+            intervalo = setInterval(() => {
+                const minutos = Math.floor(tiempoRestante / 60);
+                const segundos = tiempoRestante % 60;
+
+                const tiempoFormateado = `${minutos.toString().padStart(2, "0")}:${segundos.toString().padStart(2, "0")}`;
+                temporizador.textContent = tiempoFormateado;
+
+                tiempoRestante--;
+
+                if (tiempoRestante < 0) {
+                    clearInterval(intervalo);
+                    document.getElementById('temp').style.display = 'none';
+                    document.getElementById('downland').style.display = 'block';
+                }
+            }, 1000);
+        };
+
+        document.getElementById('configForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const instances = parseInt(document.getElementById('numNodes').value);
+
+            document.getElementById('form').style.display = 'none';
+            document.getElementById('temp').style.display = 'block';
+
+            let tiempoRestante = 5 * 60;
+            iniciarTemp(tiempoRestante);
+
+            try {
+                const response = await fetch('http://13.220.179.238:3000/run-terraform', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ instances }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al enviar la solicitud');
+                }
+
+                const data = await response.json();
+                dataFile = data;
+
+                clearInterval(intervalo);
+                document.getElementById('temp').style.display = 'none';
+                document.getElementById('downland').style.display = 'block';
+                document.getElementById('show-password').innerHTML = `
+                  <p><strong>Contraseña:</strong> ${dataFile.password}</p>
+                `;
+
+            } catch (error) {
+                console.error('Error en la solicitud:', error);
+            }
+
+            alert('¡Petición enviada!');
+        });
+
+        document.getElementById('destroyButton').addEventListener('click', async () => {
+            document.getElementById('downland').style.display = 'none';
+            document.getElementById('destroying').style.display = 'block';
+
+            try {
+                const numNodesValue = parseInt(document.getElementById('numNodes').value);
+
+                const response = await fetch('http://13.220.179.238:3000/destroy-terraform', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ instances: numNodesValue }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error en la solicitud de destrucción');
+                }
+
+                const data = await response.json();
+                console.log('Infraestructura destruida:', data);
+
+                document.getElementById('destroying').style.display = 'none';
+                document.getElementById('form').style.display = 'block';
+
+                alert('Infraestructura destruida con éxito.');
+            } catch (error) {
+                console.error('Error en la solicitud de destrucción:', error);
+                alert('Hubo un problema al destruir la infraestructura.');
+            }
+        });
+
+
+        document.getElementById('downlandAccess').addEventListener('click', () => {
+            if (!dataFile || !dataFile.instanceDNS || !dataFile.user || !dataFile.password) {
+                alert('Los datos no están disponibles para descargar.');
+                return;
+            }
+
+            const rdpContent = `
+                full address:s:${dataFile.instanceDNS}
+                username:s:${dataFile.user}
+                prompt for password:i:1
+                `;
+
+            const fileBlob = new Blob([rdpContent], { type: "application/x-rdp" });
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(fileBlob);
+            link.download = "conexion.rdp"; // Nombre del archivo .rdp
+            link.click();
+        });
+
+
+
+    </script>
+</body>
+
+</html>
