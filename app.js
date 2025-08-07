@@ -4,7 +4,10 @@ import cors from 'cors';
 import terraformRoutes from './src/routes/terraform.route.js';
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json());
 
 app.use('/api/v1', terraformRoutes);
