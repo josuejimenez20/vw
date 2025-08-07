@@ -2,6 +2,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
+output "instance_id" {
+  value = aws_instance.artist_vred.id
+}
+
 resource "aws_instance" "artist_vred" {
   ami                         = "ami-0ebe504548e3d2834"
   instance_type               = "${instance_type}"
@@ -11,8 +15,10 @@ resource "aws_instance" "artist_vred" {
   associate_public_ip_address = false
 
   tags = {
-    Name = "${instance_name}"
-  }
+  Name = "${instance_name}"
+  User = "${user_id}"
+}
+
 }
 
 
